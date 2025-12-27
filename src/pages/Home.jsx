@@ -1,73 +1,104 @@
-// src/pages/Home.jsx
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
+import { supabase } from "../lib/supabaseClient";
 
 export default function Home() {
+  const [formData, setFormData] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    message: "",
+    file: null
+  });
+
+  const [status, setStatus] = useState({ loading: false, message: "" });
+
+  const handleChange = (e) => {
+    const { name, value, files } = e.target;
+    if (files) {
+      setFormData({ ...formData, [name]: files[0] });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setStatus({ loading: true, message: "" });
+
+    try {
+      let fileUrl = null;
+
+      if (formData.file) {
+        const fileExt = formData.file.name.split(".").pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from("uploads")
+          .upload(fileName, formData.file);
+
+        if (uploadError) throw uploadError;
+
+        fileUrl = `https://iocpwvxoovybakjrahkd.supabase.co/storage/v1/object/public/uploads/${fileName}`;
+      }
+
+      const { error } = await supabase.from("contacts").insert([
+        {
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+          message: formData.message,
+          file_url: fileUrl
+        }
+      ]);
+
+      if (error) throw error;
+
+      setStatus({ loading: false, message: "Message sent successfully!" });
+      setFormData({ name: "", phone: "", email: "", message: "", file: null });
+    } catch (err) {
+      setStatus({ loading: false, message: `Error: ${err.message}` });
+    }
+  };
+
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <h1 style={styles.title}>DML Tech Support</h1>
-        <p style={styles.subtitle}>Professional Technical Assistance & IT Solutions</p>
-      </header>
-
-      <main style={styles.main}>
-        <p>Welcome! You can contact our support team or upload your files securely.</p>
-        <div style={styles.buttons}>
-          <Link to="/contact" style={styles.button}>Contact Support</Link>
-        </div>
-      </main>
-
-      <footer style={styles.footer}>
-        &copy; 2025 DML Tech Support. All rights reserved.
-      </footer>
+    <div className="container">
+      <h1>Contact Support</h1>
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          name="name"
+          placeholder="Full Name"
+          value={formData.name}
+          onChange={handleChange}
+          required
+        />
+        <input
+          type="tel"
+          name="phone"
+          placeholder="Phone"
+          value={formData.phone}
+          onChange={handleChange}
+          required
+        />
+        <input
+          type="email"
+          name="email"
+          placeholder="Email"
+          value={formData.email}
+          onChange={handleChange}
+        />
+        <textarea
+          name="message"
+          placeholder="Your message"
+          value={formData.message}
+          onChange={handleChange}
+          required
+        />
+        <input type="file" name="file" onChange={handleChange} />
+        <button type="submit" disabled={status.loading}>
+          {status.loading ? "Sending..." : "Send Message"}
+        </button>
+      </form>
+      {status.message && <p>{status.message}</p>}
     </div>
   );
 }
-
-const styles = {
-  container: {
-    minHeight: "100vh",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    alignItems: "center",
-    background: "linear-gradient(180deg, #060616 0%, #0f0f1a 100%)",
-    color: "#f8f9fa",
-    padding: "2rem"
-  },
-  header: {
-    textAlign: "center",
-    marginBottom: "2rem"
-  },
-  title: {
-    fontSize: "2rem",
-    fontWeight: "700",
-    background: "linear-gradient(90deg, #0066ff, #00d4ff)",
-    WebkitBackgroundClip: "text",
-    color: "transparent"
-  },
-  subtitle: {
-    fontSize: "1rem",
-    color: "#6c757d"
-  },
-  main: {
-    textAlign: "center"
-  },
-  buttons: {
-    marginTop: "1.5rem"
-  },
-  button: {
-    padding: "0.75rem 1.5rem",
-    background: "linear-gradient(90deg, #0066ff, #0052cc)",
-    color: "#fff",
-    borderRadius: "8px",
-    textDecoration: "none",
-    fontWeight: "600"
-  },
-  footer: {
-    textAlign: "center",
-    fontSize: "0.9rem",
-    color: "#6c757d",
-    marginTop: "2rem"
-  }
-};
